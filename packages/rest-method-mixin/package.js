@@ -1,8 +1,8 @@
 Package.describe({
-  name: 'simple:rest-method-mixin',
-  version: '1.1.0',
+  name: 'communitypackages:rest-method-mixin',
+  version: '1.1.1',
   // Brief, one-line summary of the package.
-  summary: 'Mixin for simple:rest with ValidatedMethod',
+  summary: 'Mixin for communitypackages:rest with ValidatedMethod',
   // URL to the Git repository containing the source code for this package.
   git: 'https://github.com/meteor-compat/meteor-rest',
   // By default, Meteor will default to using README.md for documentation.
@@ -11,9 +11,9 @@ Package.describe({
 });
 
 Package.onUse(function(api) {
-  api.versionsFrom('2.4');
+  api.versionsFrom('3.0');
   api.use('ecmascript');
-  api.use('simple:rest@1.2.0');
+  api.use('communitypackages:rest@2.0.0');
   api.addFiles('rest-method-mixin.js');
   api.export('RestMethodMixin');
 });
@@ -22,10 +22,10 @@ Package.onTest(function(api) {
   api.use([
     'ecmascript',
     'tinytest',
-    'simple:rest-method-mixin',
+    'communitypackages:rest-method-mixin',
     'mdg:validated-method@1.0.0',
     'test-helpers',
-    'http'
+    'fetch'
   ]);
   api.addFiles('rest-method-mixin-tests.js');
 });

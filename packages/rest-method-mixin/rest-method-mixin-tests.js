@@ -11,12 +11,12 @@ new ValidatedMethod({
 });
 
 if (Meteor.isClient) {
-  testAsyncMulti('RestMethodMixin - restOptions', [
-    function (test, waitFor) {
-      HTTP.post('/validated-method-custom-url', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, 5);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('RestMethodMixin - restOptions', async function (test) {
+    var response = await fetch('/validated-method-custom-url', {
+      method: 'POST',
+    });
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(data, 5);
+  });
 }

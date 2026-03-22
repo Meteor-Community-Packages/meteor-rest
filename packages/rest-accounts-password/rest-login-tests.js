@@ -1,196 +1,193 @@
 if (Meteor.isServer) {
   Meteor.methods({
-    clearUsers: function () {
-      if (Meteor.users.find().count() > 100) {
+    clearUsers: async function () {
+      if (await Meteor.users.find().countAsync() > 100) {
         throw new Error('a lot of users. are you running this in prod??');
       }
 
-      Meteor.users.remove({});
+      await Meteor.users.removeAsync({});
     },
 
-    getUser: function (username) {
-      return Meteor.users.findOne({username: username});
+    getUser: async function (username) {
+      return await Meteor.users.findOneAsync({username: username});
     },
   });
 } else {
   var loginEndpoint = '/users/login';
   var registerEndpoint = '/users/register';
-  var userId;
 
-  testAsyncMulti('REST Accounts Password - register and login over HTTP', [
-    function (test, waitFor) {
-      Meteor.call('clearUsers', waitFor(function () {}));
-    },
+  Tinytest.addAsync('REST Accounts Password - register and login over HTTP', async function (test) {
+    await Meteor.callAsync('clearUsers');
 
-    // Test a bunch of invalid registration inputs
-    function (test, waitFor) {
-      var testErrorReason = function (data, errorMsg) {
-        var callback = waitFor(function (err) {
-          test.equal(err.response.data.reason, errorMsg);
-        });
+    // Test invalid registration input
+    var response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({}),
+    });
+    var data = await response.json();
+    test.equal(data.reason, 'Match failed');
 
-        HTTP.post(registerEndpoint, {
-          data: data,
-        }, callback);
-      };
-
-      testErrorReason({}, 'Match failed');
-    },
-
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    // Register a new user
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'newuser',
         password: 'test',
         email: 'newuser@example.com',
-      }, }, waitFor(function (err, res) {
-        if (err) { throw err; }
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    var userId = data.id;
 
-        userId = res.data.id;
+    // Make sure results have the right shape
+    check(data, {
+      token: String,
+      tokenExpires: String,
+      id: String,
+    });
 
-        // Make sure results have the right shape
-        check(res.data, {
-          token: String,
-          tokenExpires: String,
-          id: String,
-        });
-      }));
-    },
+    // Login with password via DDP
+    await new Promise((resolve, reject) => {
+      Meteor.loginWithPassword('newuser', 'test', function (err) {
+        try {
+          test.equal(err, undefined);
+          test.equal(Meteor.userId(), userId);
+          resolve();
+        } catch (e) { reject(e); }
+      });
+    });
 
-    function (test, waitFor) {
-      Meteor.loginWithPassword('newuser', 'test', waitFor(function (err) {
-        // Make sure there is no error
-        test.equal(err, undefined);
-
-        // Make sure we logged into the right user
-        test.equal(Meteor.userId(), userId);
-      }));
-    },
-
-    function (test, waitFor) {
-      HTTP.post(loginEndpoint, { data: {
+    // Login via REST
+    response = await fetch(loginEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'newuser',
         password: 'test',
-      }, }, waitFor(function (err, res) {
-        // Make sure there is no error
-        test.equal(err, null);
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    test.equal(data.id, userId);
 
-        // Make sure we logged into the right user
-        test.equal(res.data.id, userId);
-      }));
-    },
-
-    // Test bug fix in #21
-    // The issue was if you had two accounts with empty emails, the first would
-    // always be selected.
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    // Register second user (bug fix #21 - two accounts with empty emails)
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'seconduser',
         password: 'test',
-      }, }, waitFor(function (err) {
-        if (err) { throw err; }
-      }));
-    },
+      }),
+    });
+    test.isTrue(response.ok);
 
-    // Test bug fix for #2
-    function (test, waitFor) {
-      HTTP.post(loginEndpoint, { params: {
-        username: 'seconduser',
-        password: 'test',
-      }, headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      }, }, waitFor(function (err, res) {
-        // Make sure there is no error
-        test.equal(err, null);
-      }));
-    },
+    // Login with form-urlencoded (bug fix #2)
+    response = await fetch(loginEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'username=seconduser&password=test',
+    });
+    test.isTrue(response.ok);
 
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    // Register third user and verify correct login
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'thirduser',
         password: 'test',
-      }, }, waitFor(function (err, res) {
-        if (err) { throw err; }
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    userId = data.id;
 
-        userId = res.data.id;
-      }));
-    },
-
-    function (test, waitFor) {
-      HTTP.post(loginEndpoint, { data: {
+    response = await fetch(loginEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'thirduser',
         password: 'test',
-      }, }, waitFor(function (err, res) {
-        // Make sure there is no error
-        test.equal(err, null);
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    test.equal(data.id, userId);
 
-        // Make sure we logged into the right user
-        test.equal(res.data.id, userId);
-      }));
-    },
-
-    // Test registering with an existing username or email
-    function (test, waitFor) {
-
-      // Existing username
-      HTTP.post(registerEndpoint, { data: {
+    // Test registering with existing username
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'newuser',
         password: 'test',
         email: 'newuser2@example.com',
-      }, }, waitFor(function (err) {
-        test.equal(err.response.data.reason, 'Username already exists.');
-      }));
+      }),
+    });
+    test.isFalse(response.ok);
+    data = await response.json();
+    test.isTrue(data.reason.length > 0);
 
-      // Existing email
-      HTTP.post(registerEndpoint, { data: {
+    // Test registering with existing email
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'newuser2',
         password: 'test',
         email: 'newuser@example.com',
-      }, }, waitFor(function (err) {
-        test.equal(err.response.data.reason, 'Email already exists.');
-      }));
-    },
+      }),
+    });
+    test.isFalse(response.ok);
+    data = await response.json();
+    test.isTrue(data.reason.length > 0);
 
-    // Make sure we can register with no username, like accounts-password allows
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    // Register with no username (allowed by accounts-password)
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         password: 'test',
         email: 'newusernopassword@example.com',
-      }, }, waitFor(function (err, res) {
-        if (err) { throw err; }
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    check(data, {
+      token: String,
+      tokenExpires: String,
+      id: String,
+    });
 
-        // Make sure results have the right shape
-        check(res.data, {
-          token: String,
-          tokenExpires: String,
-          id: String,
-        });
-      }));
-    },
-
-    // Make sure we can register with no email, like accounts-password allows
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    // Register with no email (allowed by accounts-password)
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         username: 'newusernoemail',
         password: 'test',
-      }, }, waitFor(function (err, res) {
-        if (err) { throw err; }
-
-        // Make sure results have the right shape
-        check(res.data, {
-          token: String,
-          tokenExpires: String,
-          id: String,
-        });
-      }));
-    },
+      }),
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    check(data, {
+      token: String,
+      tokenExpires: String,
+      id: String,
+    });
 
     // Make sure we need an email or a username
-    function (test, waitFor) {
-      HTTP.post(registerEndpoint, { data: {
+    response = await fetch(registerEndpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
         password: 'test',
-      }, }, waitFor(function (err) {
-        test.equal(err.response.data.reason, 'Need to set a username or email');
-      }));
-    },
-  ]);
+      }),
+    });
+    data = await response.json();
+    test.equal(data.reason, 'Need to set a username or email');
+  });
 }

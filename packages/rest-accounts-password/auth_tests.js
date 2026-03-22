@@ -3,42 +3,36 @@ if (Meteor.isServer) {
     JsonRoutes.sendResult(res, {data: req.userId});
   });
 } else { // Meteor.isClient
-  var token;
-  var userId;
+  Tinytest.addAsync('Middleware - Authenticate User By Token - set req.userId', async function (test) {
+    await Meteor.callAsync('clearUsers');
 
-  testAsyncMulti('Middleware - Authenticate User By Token - set req.userId', [
-    function (test, waitFor) {
-      Meteor.call('clearUsers', waitFor(function () {
-      }));
-    },
+    // Register a user
+    var response = await fetch('/users/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: 'test',
+        email: 'test@test.com',
+        password: 'test',
+      }),
+    });
+    test.isTrue(response.ok);
+    var data = await response.json();
+    test.isTrue(Match.test(data, {
+      id: String,
+      token: String,
+      tokenExpires: String,
+    }));
 
-    function (test, waitFor) {
-      HTTP.post('/users/register', {
-        data: {
-          username: 'test',
-          email: 'test@test.com',
-          password: 'test',
-        },
-      }, waitFor(function (err, res) {
-        test.equal(err, null);
-        test.isTrue(Match.test(res.data, {
-          id: String,
-          token: String,
-          tokenExpires: String,
-        }));
+    var token = data.token;
+    var userId = data.id;
 
-        token = res.data.token;
-        userId = res.data.id;
-      }));
-    },
-
-    function (test, waitFor) {
-      HTTP.get('/accounts-auth-user', {
-        headers: {Authorization: 'Bearer ' + token},
-      }, waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, userId);
-      }));
-    },
-  ]);
+    // Verify the token authenticates correctly
+    response = await fetch('/accounts-auth-user', {
+      headers: {Authorization: 'Bearer ' + token},
+    });
+    test.isTrue(response.ok);
+    data = await response.json();
+    test.equal(data, userId);
+  });
 }

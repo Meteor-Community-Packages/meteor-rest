@@ -9,7 +9,7 @@ JsonRoutes.add('options', '/users/login', function (req, res) {
   JsonRoutes.sendResult(res);
 });
 
-JsonRoutes.add('post', '/users/login', function (req, res) {
+JsonRoutes.add('post', '/users/login', async function (req, res) {
   var options = req.body;
 
   const NonEmptyString = Match.Where(x => {
@@ -24,14 +24,14 @@ JsonRoutes.add('post', '/users/login', function (req, res) {
       password: String,
       code: Match.Optional(NonEmptyString),
     });
-    user = Meteor.users.findOne({ 'emails.address': options.email });
+    user = await Meteor.users.findOneAsync({ 'emails.address': options.email });
   } else {
     check(options, {
       username: String,
       password: String,
       code: Match.Optional(NonEmptyString),
     });
-    user = Meteor.users.findOne({ username: options.username });
+    user = await Meteor.users.findOneAsync({ username: options.username });
   }
 
   if (!user) {
@@ -39,7 +39,7 @@ JsonRoutes.add('post', '/users/login', function (req, res) {
       'User with that username or email address not found.');
   }
 
-  var result = Accounts._checkPassword(user, options.password);
+  var result = await Accounts._checkPasswordAsync(user, options.password);
   check(result, {
     userId: String,
     error: Match.Optional(Meteor.Error),
@@ -48,7 +48,7 @@ JsonRoutes.add('post', '/users/login', function (req, res) {
   if (result.error) {
     throw result.error;
   }
-  
+
   if (Accounts._check2faEnabled?.(user)) {
     if (!options.code) {
       Accounts._handleError('2FA code must be informed', true, 'no-2fa-code');
@@ -69,7 +69,7 @@ JsonRoutes.add('post', '/users/login', function (req, res) {
     when: Date,
   });
 
-  Accounts._insertLoginToken(result.userId, stampedLoginToken);
+  await Accounts._insertLoginToken(result.userId, stampedLoginToken);
 
   var tokenExpiration = Accounts._tokenExpiration(stampedLoginToken.when);
   check(tokenExpiration, Date);
@@ -88,7 +88,7 @@ JsonRoutes.add('options', '/users/register', function (req, res) {
   JsonRoutes.sendResult(res);
 });
 
-JsonRoutes.add('post', '/users/register', function (req, res) {
+JsonRoutes.add('post', '/users/register', async function (req, res) {
   if(Accounts._options.forbidClientAccountCreation) {
     JsonRoutes.sendResult(res, {code: 403});
   } else {
@@ -100,8 +100,11 @@ JsonRoutes.add('post', '/users/register', function (req, res) {
       password: String,
     });
 
-    var userId = Accounts.createUser(
-      _.pick(options, 'username', 'email', 'password'));
+    var userOptions = {password: options.password};
+    if (options.username) userOptions.username = options.username;
+    if (options.email) userOptions.email = options.email;
+
+    var userId = await Accounts.createUserAsync(userOptions);
 
     // Log in the new user and send back a token
     var stampedLoginToken = Accounts._generateStampedLoginToken();
@@ -111,7 +114,7 @@ JsonRoutes.add('post', '/users/register', function (req, res) {
     });
 
     // This adds the token to the user
-    Accounts._insertLoginToken(userId, stampedLoginToken);
+    await Accounts._insertLoginToken(userId, stampedLoginToken);
 
     var tokenExpiration = Accounts._tokenExpiration(stampedLoginToken.when);
     check(tokenExpiration, Date);

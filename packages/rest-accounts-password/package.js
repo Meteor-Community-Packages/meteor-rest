@@ -1,9 +1,9 @@
 Package.describe({
-  name: 'simple:rest-accounts-password',
-  version: '1.2.2',
+  name: 'communitypackages:rest-accounts-password',
+  version: '2.0.0',
 
   // Brief, one-line summary of the package.
-  summary: 'Get a login token to use with simple:rest',
+  summary: 'Get a login token to use with communitypackages:rest',
 
   // URL to the Git repository containing the source code for this package.
   git: 'https://github.com/meteor-compat/meteor-rest',
@@ -14,16 +14,15 @@ Package.describe({
 });
 
 Package.onUse(function (api) {
-  api.versionsFrom('2.4');
+  api.versionsFrom('3.0');
 
   api.use([
     'accounts-password',
     'check',
-    'simple:json-routes@2.3.0',
-    'simple:authenticate-user-by-token@1.2.0',
-    'simple:rest-bearer-token-parser@1.1.0',
-    'simple:rest-json-error-handler@1.1.0',
-    'underscore',
+    'communitypackages:json-routes@3.0.0',
+    'communitypackages:authenticate-user-by-token@2.0.0',
+    'communitypackages:rest-bearer-token-parser@1.1.0',
+    'communitypackages:rest-json-error-handler@1.1.0',
   ], 'server');
 
   api.addFiles('rest-login.js', 'server');
@@ -33,10 +32,10 @@ Package.onTest(function (api) {
   api.use([
     'accounts-password',
     'check',
-    'http',
-    'simple:rest-accounts-password',
-    'simple:authenticate-user-by-token',
-    'simple:json-routes',
+    'fetch',
+    'communitypackages:rest-accounts-password',
+    'communitypackages:authenticate-user-by-token',
+    'communitypackages:json-routes',
     'test-helpers',
     'tinytest',
   ]);

@@ -2,24 +2,24 @@
 
 **Compatible with Meteor 2.4**
 
-This repository provides versions for the package [simple:rest-accounts-password](https://github.com/meteor-compat/meteor-rest/tree/devel/packages/rest-accounts-password) that are compatible with latest Meteor. This is necessary because the author is not maintaining package anymore.
+This repository provides versions for the package [communitypackages:rest-accounts-password](https://github.com/meteor-compat/meteor-rest/tree/devel/packages/rest-accounts-password) that are compatible with latest Meteor. This is necessary because the author is not maintaining package anymore.
 
 ## Changes
 - v1.2.2
   - Fixes users/login using cURL [#3](https://github.com/meteor-compat/meteor-rest/pull/3)
   - 2FA support [#4](https://github.com/meteor-compat/meteor-rest/pull/4)
 - v1.2.1
-  - Update simple:json-routes to 2.3.0
+  - Update communitypackages:json-routes to 2.3.0
 - v1.2.0
   - `api.versionsFrom` on `Package.onUse` was changed from `1.1.0.2` to `2.4`.
 
 ## Log in and register password accounts over HTTP
 
 ```sh
-meteor add simple:rest-accounts-password
+meteor add communitypackages:rest-accounts-password
 ```
 
-If you have `accounts-password` in your app, and you want to be able to use it over HTTP, this is the package for you. Call these APIs to get an access token, and pass that token to API methods you defined with [`simple:rest`](https://github.com/stubailo/meteor-rest/blob/master/packages/rest/README.md#authentication) to call methods and publications that require login.
+If you have `accounts-password` in your app, and you want to be able to use it over HTTP, this is the package for you. Call these APIs to get an access token, and pass that token to API methods you defined with [`communitypackages:rest`](https://github.com/stubailo/meteor-rest/blob/master/packages/rest/README.md#authentication) to call methods and publications that require login.
 
 Make sure to serve your app over HTTPS if you are using this for login, otherwise people can hijack your passwords. Try the [`force-ssl` package](https://atmospherejs.com/meteor/force-ssl).
 
@@ -79,11 +79,11 @@ HTTP.post("/methods/return-five-auth", {
 #### 1.1.0
 
 - Add token parsing and auth middleware into the middleware stack
-  - This functionality was moved from simple:rest, since it's outside its scope
+  - This functionality was moved from communitypackages:rest, since it's outside its scope
   - _Known issue: Middleware is added on all routes (user should have control
     over which routes middleware is applied, and at the very least it should be
     restricted to API routes)_
-- Use the latest version of `simple:json-routes` (1.0.3)
+- Use the latest version of `communitypackages:json-routes` (1.0.3)
 
 #### 1.0.3
 

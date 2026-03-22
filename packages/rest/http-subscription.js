@@ -14,7 +14,7 @@ HttpSubscription = function (options) {
 // So that we can listen to ready event in a reasonable way
 Meteor._inherits(HttpSubscription, EventEmitter);
 
-_.extend(HttpSubscription.prototype, {
+Object.assign(HttpSubscription.prototype, {
   added: function (collection, id, fields) {
     var self = this;
 
@@ -25,7 +25,8 @@ _.extend(HttpSubscription.prototype, {
     self._ensureCollectionInRes(collection);
 
     // Make sure to ignore the _id in fields
-    var addedDocument = _.extend({_id: id}, _.omit(fields, '_id'));
+    var {_id, ...rest} = fields;
+    var addedDocument = Object.assign({_id: id}, rest);
     self.responseData[collection][id] = addedDocument;
   },
 
@@ -39,11 +40,11 @@ _.extend(HttpSubscription.prototype, {
     self._ensureCollectionInRes(collection);
 
     var existingDocument = this.responseData[collection][id];
-    var fieldsNoId = _.omit(fields, '_id');
-    _.extend(existingDocument, fieldsNoId);
+    var {_id, ...fieldsNoId} = fields;
+    Object.assign(existingDocument, fieldsNoId);
 
     // Delete all keys that were undefined in fields (except _id)
-    _.each(fields, function (value, key) {
+    Object.entries(fields).forEach(function ([key, value]) {
       if (value === undefined) {
         delete existingDocument[key];
       }
@@ -61,7 +62,7 @@ _.extend(HttpSubscription.prototype, {
 
     delete self.responseData[collection][id];
 
-    if (_.isEmpty(self.responseData[collection])) {
+    if (Object.keys(self.responseData[collection]).length === 0) {
       delete self.responseData[collection];
     }
   },
@@ -85,8 +86,8 @@ _.extend(HttpSubscription.prototype, {
   _generateResponse: function () {
     var output = {};
 
-    _.each(this.responseData, function (documents, collectionName) {
-      output[collectionName] = _.values(documents);
+    Object.entries(this.responseData).forEach(function ([collectionName, documents]) {
+      output[collectionName] = Object.values(documents);
     });
 
     return output;

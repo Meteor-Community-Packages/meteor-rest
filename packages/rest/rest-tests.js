@@ -5,12 +5,6 @@ if (Meteor.isServer) {
   );
   JsonRoutes.ErrorMiddleware.use(RestMiddleware.handleErrorAsJson);
 
-  //  SimpleRest.configure({
-  //    objectIdCollections: ['widgets']
-  //  });
-  //
-  //  var Widgets = new Mongo.Collection('widgets', {idGeneration: 'MONGO'});
-
   var Widgets = new Mongo.Collection('widgets');
 
   Meteor.publish('widgets', function () {
@@ -20,24 +14,24 @@ if (Meteor.isServer) {
   var Doodles = new Mongo.Collection('doodles');
 
   Meteor.methods({
-    'reset-db': function () {
-      Widgets.remove({});
+    'reset-db': async function () {
+      await Widgets.removeAsync({});
 
-      _.each(_.range(10), function (index) {
-        Widgets.insert({
+      for (var index = 0; index < 10; index++) {
+        await Widgets.insertAsync({
           index: index,
         });
-      });
+      }
 
-      Doodles.remove({});
+      await Doodles.removeAsync({});
 
-      _.each(_.range(10), function (index) {
-        Doodles.insert({
+      for (var index = 0; index < 10; index++) {
+        await Doodles.insertAsync({
           index: index,
         });
-      });
+      }
 
-      Doodles.insert({
+      await Doodles.insertAsync({
         _id: '123',
         index: 11,
       });
@@ -51,10 +45,10 @@ if (Meteor.isServer) {
     ];
   });
 
-  Meteor.publish('widgets-manual', function () {
+  Meteor.publish('widgets-manual', async function () {
     var self = this;
 
-    Widgets.find().forEach(function (widget) {
+    await Widgets.find().forEachAsync(function (widget) {
       self.added('widgets', widget._id, widget);
     });
 
@@ -213,8 +207,8 @@ if (Meteor.isServer) {
       '/doodles/:_id',
     ];
 
-    _.each(mutatorMethodPaths, function (path) {
-      test.isTrue(!!_.findWhere(JsonRoutes.routes, {path: path}));
+    mutatorMethodPaths.forEach(function (path) {
+      test.isTrue(!!JsonRoutes.routes.find(function (r) { return r.path === path; }));
     });
   });
 
@@ -246,333 +240,270 @@ if (Meteor.isServer) {
     },
   });
 } else {
-  // Using Meteor HTTP
-  testAsyncMulti('Simple REST - getting a publication', [
-    function (test, waitFor) {
-      HTTP.post('/methods/reset-db', waitFor(function () {}));
-    },
+  // Using fetch API
 
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 10);
-      }));
-    },
+  async function postJson(url, data) {
+    return await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: data !== undefined ? JSON.stringify(data) : undefined,
+    });
+  }
 
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets-manual', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 10);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - getting a publication', async function (test) {
+    await postJson('/methods/reset-db');
 
-  testAsyncMulti('Simple REST - getting a publication with multiple cursors', [
-    function (test, waitFor) {
-      HTTP.get('/publications/doodles-and-widgets',
-        waitFor(function (err, res) {
-          test.equal(err, null);
-          test.equal(_.size(res.data.widgets), 10);
-          test.equal(_.size(res.data.doodles), 11);
-        })
-      );
-    },
-  ]);
+    var response = await fetch('/publications/widgets');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 10);
 
-  testAsyncMulti('Simple REST - getting a publication with custom URL', [
-    function (test, waitFor) {
-      HTTP.post('/i-love-widgets', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 10);
-      }));
-    },
-  ]);
+    response = await fetch('/publications/widgets-manual');
+    data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 10);
+  });
 
-  testAsyncMulti('Simple REST - getting a publication with URL arguments', [
-    function (test, waitFor) {
-      HTTP.get('/widgets-with-index-above/4', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 5);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - getting a publication with multiple cursors', async function (test) {
+    var response = await fetch('/publications/doodles-and-widgets');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 10);
+    test.equal(Object.keys(data.doodles).length, 11);
+  });
 
-  testAsyncMulti('Simple REST - getting a publication with query arguments', [
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets-above-index-custom-args?index=4',
-        waitFor(function (err, res) {
-          test.equal(err, null);
-          test.equal(_.size(res.data.widgets), 5);
-        }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - getting a publication with custom URL', async function (test) {
+    var response = await postJson('/i-love-widgets');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 10);
+  });
 
-  var token;
-  testAsyncMulti('Simple REST - getting a publication with authorization', [
-    function (test, waitFor) {
-      Meteor.call('clearUsers', waitFor(function () {}));
-    },
+  Tinytest.addAsync('Simple REST - getting a publication with URL arguments', async function (test) {
+    var response = await fetch('/widgets-with-index-above/4');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 5);
+  });
 
-    function (test, waitFor) {
-      HTTP.post('/users/register', { data: {
-        username: 'test',
-        email: 'test@test.com',
-        password: 'test',
-      }, }, waitFor(function (err, res) {
-        test.equal(err, null);
-        test.isTrue(Match.test(res.data, {
-          id: String,
-          token: String,
-          tokenExpires: String,
-        }));
+  Tinytest.addAsync('Simple REST - getting a publication with query arguments', async function (test) {
+    var response = await fetch('/publications/widgets-above-index-custom-args?index=4');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 5);
+  });
 
-        token = res.data.token;
-      }));
-    },
+  Tinytest.addAsync('Simple REST - getting a publication with authorization', async function (test) {
+    await Meteor.callAsync('clearUsers');
 
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets-authorized', {
-        headers: { Authorization: 'Bearer ' + token },
-      }, waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 10);
-      }));
-    },
-  ]);
+    var response = await postJson('/users/register', {
+      username: 'test',
+      email: 'test@test.com',
+      password: 'test',
+    });
+    var regData = await response.json();
+    test.isTrue(response.ok);
+    test.isTrue(Match.test(regData, {
+      id: String,
+      token: String,
+      tokenExpires: String,
+    }));
 
-  testAsyncMulti('Simple REST - calling method', [
-    function (test, waitFor) {
-      HTTP.post('/methods/return-five', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, 5);
-      }));
-    },
-  ]);
+    var token = regData.token;
 
-  testAsyncMulti('Simple REST - setMethodOptions', [
-    function (test, waitFor) {
-      HTTP.post('/my-custom-url', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, 5);
-      }));
-    },
-  ]);
+    response = await fetch('/publications/widgets-authorized', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(Object.keys(data.widgets).length, 10);
+  });
 
-  testAsyncMulti('Simple REST - calling method with auth', [
-    function (test, waitFor) {
-      HTTP.post('/methods/return-five-auth', {
-        headers: { Authorization: 'Bearer ' + token },
-      }, waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, 5);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - calling method', async function (test) {
+    var response = await postJson('/methods/return-five');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(data, 5);
+  });
 
-  testAsyncMulti('Simple REST - calling method with wrong auth', [
-    function (test, expect) {
-      HTTP.post('/methods/return-five-auth', {
-        headers: { Authorization: 'Bearer foo' },
-      }, expect(function (err, res) {
-        test.equal(err, null);
-        test.equal(res.data, 0);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - setMethodOptions', async function (test) {
+    var response = await postJson('/my-custom-url');
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(data, 5);
+  });
 
-  testAsyncMulti('Simple REST - method error', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-error', expect(function (err, res) {
-        test.isTrue(!!err);
-        test.equal(res.data.error, 'internal-server-error');
-        test.equal(res.statusCode, 500);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - calling method with auth', async function (test) {
+    // Re-register for a fresh token
+    await Meteor.callAsync('clearUsers');
+    var regResponse = await postJson('/users/register', {
+      username: 'test',
+      email: 'test@test.com',
+      password: 'test',
+    });
+    var regData = await regResponse.json();
+    var token = regData.token;
 
-  testAsyncMulti('Simple REST - method meteor error', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-meteor-error', expect(function (err, res) {
-        test.isTrue(!!err);
-        test.equal(res.data.reason, 'Foo');
-        test.equal(res.statusCode, 400);
-      }));
-    },
-  ]);
+    var response = await fetch('/methods/return-five-auth', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(data, 5);
+  });
 
-  testAsyncMulti('Simple REST - method error with meteor error', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-sanitized-error', expect(function (err, res) {
-        test.isTrue(!!err);
-        test.equal(res.data.reason, 'Foo');
-        test.equal(res.statusCode, 400);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - calling method with wrong auth', async function (test) {
+    var response = await fetch('/methods/return-five-auth', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer foo' },
+    });
+    var data = await response.json();
+    test.equal(response.status, 200);
+    test.equal(data, 0);
+  });
 
-  testAsyncMulti('Simple REST - method error custom', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-error-custom', expect(function (err, res) {
-        test.isTrue(!!err);
-        test.equal(res.data.error, 'internal-server-error');
-        test.equal(res.statusCode, 499);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - method error', async function (test) {
+    var response = await postJson('/methods/throws-error');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.error, 'internal-server-error');
+    test.equal(response.status, 500);
+  });
 
-  testAsyncMulti('Simple REST - method meteor error custom', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-meteor-error-custom',
-                expect(function (err, res) {
-                  test.isTrue(!!err);
-                  test.equal(res.data.data.ding, 'dong');
-                  test.equal(res.statusCode, 499);
-                })
-               );
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - method meteor error', async function (test) {
+    var response = await postJson('/methods/throws-meteor-error');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.reason, 'Foo');
+    test.equal(response.status, 400);
+  });
 
-  testAsyncMulti('Simple REST - method error with meteor error custom', [
-    function (test, expect) {
-      HTTP.post('/methods/throws-sanitized-error-custom',
-                expect(function (err, res) {
-                  test.isTrue(!!err);
-                  test.equal(res.data.data.ding, 'dong');
-                  test.equal(res.statusCode, 499);
-                })
-               );
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - method error with meteor error', async function (test) {
+    var response = await postJson('/methods/throws-sanitized-error');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.reason, 'Foo');
+    test.equal(response.status, 400);
+  });
 
-  testAsyncMulti('Simple REST - method status code', [
-    function (test, expect) {
-      HTTP.post('/methods/status-code', expect(function (err, res) {
-        test.isFalse(!!err);
-        test.equal(res.statusCode, 222);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - method error custom', async function (test) {
+    var response = await postJson('/methods/throws-error-custom');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.error, 'internal-server-error');
+    test.equal(response.status, 499);
+  });
 
-  var widgets = [];
-  testAsyncMulti('Simple REST - mutator methods', [
-    function (test, waitFor) {
-      HTTP.post('/widgets', {
-        data: [
-          {
-            index: 10,
-          },
-        ],
-      }, waitFor(function (err) {
-        test.equal(err, null);
-      }));
+  Tinytest.addAsync('Simple REST - method meteor error custom', async function (test) {
+    var response = await postJson('/methods/throws-meteor-error-custom');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.data.ding, 'dong');
+    test.equal(response.status, 499);
+  });
 
-      HTTP.post('/doodles', {
-        data: [
-          {
-            index: 10,
-          },
-        ],
-      }, waitFor(function (err) {
-        test.equal(err.response.data.reason, 'Access denied');
-      }));
-    },
+  Tinytest.addAsync('Simple REST - method error with meteor error custom', async function (test) {
+    var response = await postJson('/methods/throws-sanitized-error-custom');
+    var data = await response.json();
+    test.isTrue(!response.ok);
+    test.equal(data.data.ding, 'dong');
+    test.equal(response.status, 499);
+  });
 
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets', waitFor(function (err, res) {
-        test.equal(err, null);
-        test.equal(_.size(res.data.widgets), 11);
-        widgets = res.data.widgets;
-      }));
-    },
+  Tinytest.addAsync('Simple REST - method status code', async function (test) {
+    var response = await postJson('/methods/status-code');
+    test.equal(response.status, 222);
+  });
 
-    function (test, waitFor) {
-      var _id = _.values(widgets)[0]._id;
-      HTTP.call('patch', '/widgets/' + _id, {
-        data: {
-          specialKey: 'Over 9000!',
-        },
-      }, waitFor(function (err, response) {
-        // PhantomJS (pre 2.0) does not send body with PATCH
-        // ajax requests so this will fail.
-        // See https://github.com/ariya/phantomjs/issues/11384
-        if (window.callPhantom) return;
-        test.equal(err, null);
-        test.equal(response.data, 1);
-      }));
+  Tinytest.addAsync('Simple REST - mutator methods', async function (test) {
+    // Reset DB first
+    await postJson('/methods/reset-db');
 
-      HTTP.call('patch', '/doodles/123', {
-        data: {
-          specialKey: 'Over 9000!',
-        },
-      }, waitFor(function (err) {
-        // PhantomJS (pre 2.0) does not send body with PATCH
-        // ajax requests so this will fail.
-        // See https://github.com/ariya/phantomjs/issues/11384
-        if (window.callPhantom) return;
-        test.equal(err.response.data.reason, 'Access denied');
-      }));
-    },
+    // Insert a widget
+    var response = await postJson('/widgets', [{index: 10}]);
+    test.isTrue(response.ok);
 
-    function (test, waitFor) {
-      HTTP.get('/publications/widgets', waitFor(function (err, res) {
-        test.equal(err, null);
+    // Insert a doodle (should fail - not allowed)
+    response = await postJson('/doodles', [{index: 10}]);
+    var data = await response.json();
+    test.equal(data.reason, 'Access denied');
 
-        // PhantomJS (pre 2.0) does not send body with PATCH
-        // ajax requests so this will fail.
-        // See https://github.com/ariya/phantomjs/issues/11384
-        if (window.callPhantom) return;
+    // Verify widget count
+    response = await fetch('/publications/widgets');
+    data = await response.json();
+    test.equal(Object.keys(data.widgets).length, 11);
+    var widgets = data.widgets;
 
-        // Make sure our special key was saved
-        test.isTrue(!!_.findWhere(res.data.widgets,
-          { specialKey: 'Over 9000!' }));
-      }));
-    },
+    // Patch a widget
+    var _id = Object.values(widgets)[0]._id;
+    response = await fetch('/widgets/' + _id, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({specialKey: 'Over 9000!'}),
+    });
+    data = await response.json();
+    test.isTrue(response.ok);
+    test.equal(data, 1);
 
-    function (test, waitFor) {
-      HTTP.del('/widgets/' + _.values(widgets)[0]._id, waitFor(function (err) {
-        test.equal(err, null);
-      }));
+    // Patch a doodle (should fail)
+    response = await fetch('/doodles/123', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({specialKey: 'Over 9000!'}),
+    });
+    data = await response.json();
+    test.equal(data.reason, 'Access denied');
 
-      HTTP.del('/doodles/123', waitFor(function (err) {
-        test.equal(err.response.data.reason, 'Access denied');
-      }));
-    },
-  ]);
+    // Verify the special key was saved
+    response = await fetch('/publications/widgets');
+    data = await response.json();
+    test.isTrue(!!data.widgets.find(function (w) { return w.specialKey === 'Over 9000!'; }));
 
-  // Some tests with JQuery as well
-  testAsyncMulti('Simple REST - calling method with JQuery', [
-    function (test, waitFor) {
+    // Delete a widget
+    response = await fetch('/widgets/' + Object.values(widgets)[0]._id, {
+      method: 'DELETE',
+    });
+    test.isTrue(response.ok);
+
+    // Delete a doodle (should fail)
+    response = await fetch('/doodles/123', {
+      method: 'DELETE',
+    });
+    data = await response.json();
+    test.equal(data.reason, 'Access denied');
+  });
+
+  // Tests with JQuery
+  Tinytest.addAsync('Simple REST - calling method with JQuery', async function (test) {
+    var data = await new Promise(function (resolve) {
       $.ajax({
         method: 'post',
         url: '/methods/add-all-arguments',
         data: JSON.stringify([1, 2, 3]),
         contentType: 'application/json',
-        success: waitFor(function (data) {
-          test.equal(data, 6);
-        }),
+        success: resolve,
       });
-    },
-  ]);
+    });
+    test.equal(data, 6);
+  });
 
-  // Some tests with JQuery as well
-  testAsyncMulti('Simple REST - ' +
-                 'calling method with JQuery with custom getArgsFromRequest', [
-    function (test, waitFor) {
+  Tinytest.addAsync('Simple REST - ' +
+                 'calling method with JQuery with custom getArgsFromRequest', async function (test) {
+    var data = await new Promise(function (resolve) {
       $.ajax({
         method: 'get',
         url: '/add-arguments-from-url/2/3',
-        success: waitFor(function (data) {
-          test.equal(data, 5);
-        }),
+        success: resolve,
       });
-    },
-  ]);
+    });
+    test.equal(data, 5);
+  });
 
-  testAsyncMulti('Simple REST - getting publication with JQuery', [
-    function (test, waitFor) {
-      $.get('/publications/widgets', waitFor(function (data) {
-        test.equal(data.widgets.length, 10);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Simple REST - getting publication with JQuery', async function (test) {
+    var data = await new Promise(function (resolve) {
+      $.get('/publications/widgets', resolve);
+    });
+    test.equal(data.widgets.length, 10);
+  });
 }

@@ -1,4 +1,4 @@
-/* global JsonRoutes:false - from simple:json-routes package */
+/* global JsonRoutes:false - from communitypackages:json-routes package */
 /* global paths:true */
 /* global pathInfo:true */
 
@@ -9,7 +9,7 @@ Meteor.publish('api-routes', function () {
   // Deduplicate routes across paths
   paths = {};
 
-  _.each(JsonRoutes.routes, function (route) {
+  JsonRoutes.routes.forEach(function (route) {
     pathInfo = paths[route.path] || { methods: [], path: route.path };
 
     pathInfo.methods.push(route.method);
@@ -17,7 +17,7 @@ Meteor.publish('api-routes', function () {
     paths[route.path] = pathInfo;
   });
 
-  _.each(paths, function (pathInfo, path) {
+  Object.entries(paths).forEach(function ([path, pathInfo]) {
     self.added('api-routes', path, pathInfo);
   });
 

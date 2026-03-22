@@ -10,7 +10,7 @@ SimpleRest = {};
 //    objectIdCollections: ['widgets', 'doodles']
 SimpleRest._config = {};
 SimpleRest.configure = function (config) {
-  return _.extend(SimpleRest._config, config);
+  return Object.assign(SimpleRest._config, config);
 };
 
 SimpleRest._methodOptions = {};
@@ -21,18 +21,16 @@ SimpleRest.setMethodOptions = function (name, options) {
 
   // Throw an error if the Method is already defined - too late to pass
   // options
-  if (_.has(Meteor.server.method_handlers, name)) {
+  if (name in Meteor.server.method_handlers) {
     throw new Error('Must pass options before Method is defined: ' +
       name);
   }
 
   options = options || {};
 
-  _.defaults(options, {
-    url: 'methods/' + name,
-    getArgsFromRequest: defaultGetArgsFromRequest,
-    httpMethod: 'post',
-  });
+  if (!('url' in options)) options.url = 'methods/' + name;
+  if (!('getArgsFromRequest' in options)) options.getArgsFromRequest = defaultGetArgsFromRequest;
+  if (!('httpMethod' in options)) options.httpMethod = 'post';
 
   SimpleRest._methodOptions[name] = options;
 };
@@ -47,19 +45,19 @@ Meteor.publish = function (name, handler, options) {
     'httpMethod',
   ];
 
-  var httpOptions = _.pick(options, httpOptionKeys);
-  var ddpOptions = _.omit(options, httpOptionKeys);
+  var httpOptions = Object.fromEntries(
+    Object.entries(options).filter(function ([k]) { return httpOptionKeys.includes(k); }));
+  var ddpOptions = Object.fromEntries(
+    Object.entries(options).filter(function ([k]) { return !httpOptionKeys.includes(k); }));
 
   // Register DDP publication
   oldPublish(name, handler, ddpOptions);
 
-  _.defaults(httpOptions, {
-    url: 'publications/' + name,
-    getArgsFromRequest: defaultGetArgsFromRequest,
-    httpMethod: 'get',
-  });
+  if (!('url' in httpOptions)) httpOptions.url = 'publications/' + name;
+  if (!('getArgsFromRequest' in httpOptions)) httpOptions.getArgsFromRequest = defaultGetArgsFromRequest;
+  if (!('httpMethod' in httpOptions)) httpOptions.httpMethod = 'get';
 
-  JsonRoutes.add(httpOptions.httpMethod, httpOptions.url, function (req, res) {
+  JsonRoutes.add(httpOptions.httpMethod, httpOptions.url, async function (req, res) {
     var userId = req.userId || null;
 
     var httpSubscription = new HttpSubscription({
@@ -73,20 +71,20 @@ Meteor.publish = function (name, handler, options) {
 
     var handlerArgs = httpOptions.getArgsFromRequest(req);
 
-    var handlerReturn = handler.apply(httpSubscription, handlerArgs);
+    var handlerReturn = await handler.apply(httpSubscription, handlerArgs);
 
     // Fast track for publishing cursors - we don't even need livequery here,
     // just making a normal DB query
     if (handlerReturn && handlerReturn._publishCursor) {
-      httpPublishCursor(handlerReturn, httpSubscription);
+      await httpPublishCursor(handlerReturn, httpSubscription);
       httpSubscription.ready();
-    } else if (handlerReturn && _.isArray(handlerReturn)) {
+    } else if (handlerReturn && Array.isArray(handlerReturn)) {
       // We don't need to run the checks to see if
       // the cursors overlap and stuff
       // because calling Meteor.publish will do that for us :]
-      _.each(handlerReturn, function (cursor) {
-        httpPublishCursor(cursor, httpSubscription);
-      });
+      for (var i = 0; i < handlerReturn.length; i++) {
+        await httpPublishCursor(handlerReturn[i], httpSubscription);
+      }
 
       httpSubscription.ready();
     }
@@ -110,12 +108,12 @@ Meteor.method = function (name, handler, options) {
   if (insideDefineMutationMethods) {
     var collectionName = name.split('/')[1];
 
-    if (_.isArray(SimpleRest._config.collections) &&
-       !_.contains(SimpleRest._config.collections, collectionName)) return;
+    if (Array.isArray(SimpleRest._config.collections) &&
+       !SimpleRest._config.collections.includes(collectionName)) return;
 
     var isObjectId = false;
-    if (_.isArray(SimpleRest._config.objectIdCollections) &&
-       _.contains(SimpleRest._config.objectIdCollections, collectionName)) {
+    if (Array.isArray(SimpleRest._config.objectIdCollections) &&
+       SimpleRest._config.objectIdCollections.includes(collectionName)) {
       isObjectId = true;
     }
 
@@ -176,7 +174,7 @@ Mongo.Collection.prototype._defineMutationMethods = function () {
 
 Meteor.methods = Object.getPrototypeOf(Meteor.server).methods =
   function (methodMap) {
-    _.each(methodMap, function (handler, name) {
+    Object.entries(methodMap).forEach(function ([name, handler]) {
       Meteor.method(name, handler);
     });
   };
@@ -184,15 +182,15 @@ Meteor.methods = Object.getPrototypeOf(Meteor.server).methods =
 function addHTTPMethod(methodName, handler, options) {
   options = options || SimpleRest._methodOptions[methodName] || {};
 
-  options = _.defaults(options, {
-    getArgsFromRequest: defaultGetArgsFromRequest,
-  });
+  if (!('getArgsFromRequest' in options)) {
+    options.getArgsFromRequest = defaultGetArgsFromRequest;
+  }
 
   JsonRoutes.add('options', options.url, function (req, res) {
     JsonRoutes.sendResult(res);
   });
 
-  JsonRoutes.add(options.httpMethod, options.url, function (req, res) {
+  JsonRoutes.add(options.httpMethod, options.url, async function (req, res) {
     var userId = req.userId || null;
     var statusCode = 200;
 
@@ -201,7 +199,7 @@ function addHTTPMethod(methodName, handler, options) {
       userId: userId,
       setUserId: function () {
         throw Error('setUserId not implemented in this ' +
-                      'version of simple:rest');
+                      'version of communitypackages:rest');
       },
 
       isSimulation: false,
@@ -215,7 +213,7 @@ function addHTTPMethod(methodName, handler, options) {
     };
 
     var handlerArgs = options.getArgsFromRequest(req);
-    var handlerReturn = handler.apply(methodInvocation, handlerArgs);
+    var handlerReturn = await handler.apply(methodInvocation, handlerArgs);
     JsonRoutes.sendResult(res, {
       code: statusCode,
       data: handlerReturn,
@@ -223,8 +221,9 @@ function addHTTPMethod(methodName, handler, options) {
   });
 }
 
-function httpPublishCursor(cursor, subscription) {
-  _.each(cursor.fetch(), function (document) {
+async function httpPublishCursor(cursor, subscription) {
+  var documents = await cursor.fetchAsync();
+  documents.forEach(function (document) {
     subscription.added(cursor._cursorDescription.collectionName,
       document._id, document);
   });
@@ -237,15 +236,15 @@ function defaultGetArgsFromRequest(req) {
     args = EJSON.fromJSONValue(req.body);
 
     // If it's an object, pass the entire object as the only argument
-    if (!_.isArray(args)) {
+    if (!Array.isArray(args)) {
       args = [args];
     }
   }
 
-  _.each(req.params, function (value, name) {
+  Object.entries(req.params).forEach(function ([name, value]) {
     var parsed = parseInt(name, 10);
 
-    if (_.isNaN(parsed)) {
+    if (Number.isNaN(parsed)) {
       throw new Error('REST publish doesn\'t support parameters ' +
                       'whose names aren\'t integers.');
     }

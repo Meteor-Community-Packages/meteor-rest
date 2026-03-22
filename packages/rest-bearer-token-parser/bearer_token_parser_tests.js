@@ -13,27 +13,19 @@ if (Meteor.isServer) {
 } else { // Meteor.isClient
   var token = 'testToken';
 
-  testAsyncMulti('Middleware - Bearer Token Parser - parse valid headers', [
-    function (test, waitFor) {
-      HTTP.get(Meteor.absoluteUrl('/parse-bearer-token'), {
-        headers: {authorization: 'Bearer ' + token},
-      }, waitFor(function (err, resp) {
-        test.equal(err, null);
-        test.equal(resp.statusCode, SUCCESS_STATUS_CODE);
-        test.equal(resp.data, token);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Middleware - Bearer Token Parser - parse valid headers', async function (test) {
+    var response = await fetch(Meteor.absoluteUrl('/parse-bearer-token'), {
+      headers: {authorization: 'Bearer ' + token},
+    });
+    var data = await response.json();
+    test.equal(response.status, SUCCESS_STATUS_CODE);
+    test.equal(data, token);
+  });
 
-  testAsyncMulti('Middleware - Bearer Token Parser - parse valid query param', [
-    function (test, waitFor) {
-      HTTP.get(Meteor.absoluteUrl('/parse-bearer-token'), {
-        query: 'access_token=' + token,
-      }, waitFor(function (err, resp) {
-        test.equal(err, null);
-        test.equal(resp.statusCode, SUCCESS_STATUS_CODE);
-        test.equal(resp.data, token);
-      }));
-    },
-  ]);
+  Tinytest.addAsync('Middleware - Bearer Token Parser - parse valid query param', async function (test) {
+    var response = await fetch(Meteor.absoluteUrl('/parse-bearer-token?access_token=' + token));
+    var data = await response.json();
+    test.equal(response.status, SUCCESS_STATUS_CODE);
+    test.equal(data, token);
+  });
 }

@@ -10,15 +10,12 @@ if (Meteor.isServer) {
     throw error;
   });
 } else { // Meteor.isClient
-  testAsyncMulti('Middleware - JSON Error Handling - ' +
-    'handle standard Connect error with JSON response', [
-    function (test, waitFor) {
-      HTTP.get(Meteor.absoluteUrl('/handle-error'),
-        waitFor(function (err, resp) {
-          test.equal(resp.statusCode, 404);
-          test.equal(resp.data.error, 'not-found');
-          test.equal(resp.data.reason, 'Not Found');
-        }));
-    },
-  ]);
+  Tinytest.addAsync('Middleware - JSON Error Handling - ' +
+    'handle standard Connect error with JSON response', async function (test) {
+    var response = await fetch(Meteor.absoluteUrl('/handle-error'));
+    var data = await response.json();
+    test.equal(response.status, 404);
+    test.equal(data.error, 'not-found');
+    test.equal(data.reason, 'Not Found');
+  });
 }

@@ -1,5 +1,3 @@
-var Fiber = Npm.require('fibers');
-
 /**
  * SimpleRest middleware for validating a Meteor.user's login token
  *
@@ -11,15 +9,16 @@ var Fiber = Npm.require('fibers');
  * @middleware
  */
 JsonRoutes.Middleware.authenticateMeteorUserByToken =
-  function (req, res, next) {
-    Fiber(function () {
-      var userId = getUserIdFromAuthToken(req.authToken);
+  async function (req, res, next) {
+    try {
+      var userId = await getUserIdFromAuthToken(req.authToken);
       if (userId) {
         req.userId = userId;
       }
-
       next();
-    }).run();
+    } catch (error) {
+      next(error);
+    }
   };
 
 /**
@@ -29,12 +28,12 @@ JsonRoutes.Middleware.authenticateMeteorUserByToken =
  * @returns {String} The ID of the authenticated Meteor.user, or null if token
  *     is invalid
  */
-function getUserIdFromAuthToken(token) {
+async function getUserIdFromAuthToken(token) {
   if (!token) {
     return null;
   }
 
-  var user = Meteor.users.findOne({
+  var user = await Meteor.users.findOneAsync({
     'services.resume.loginTokens.hashedToken': Accounts._hashLoginToken(token)
   }, {fields: {_id: 1}});
   if (user) {

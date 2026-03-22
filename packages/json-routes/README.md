@@ -2,7 +2,7 @@
 
 **Compatible with Meteor 3.0**
 
-This repository provides versions for the package [simple:authenticate-user-by-token](https://github.com/meteor-compat/meteor-rest/tree/devel/packages/authenticate-user-by-token) that are compatible with latest Meteor. This is necessary because the author is not maintaining package anymore.
+This repository provides versions for the package [communitypackages:authenticate-user-by-token](https://github.com/meteor-compat/meteor-rest/tree/devel/packages/authenticate-user-by-token) that are compatible with latest Meteor. This is necessary because the author is not maintaining package anymore.
 
 ## Breaking changes
 - v3.0.0 
@@ -38,7 +38,7 @@ This repository provides versions for the package [simple:authenticate-user-by-t
 - v2.2.0 - Broken (don't use it)
   - `api.versionsFrom` on `Package.onUse` was changed from `1.0` to `2.4`.
   
-# simple:json-routes
+# communitypackages:json-routes
 
 <https://atmospherejs.com/simple/json-routes>
 
@@ -150,8 +150,8 @@ Alternatively, you could publish a pure NodeJS middleware package to NPM, and yo
 
 ### Auth Middleware
 
-- By convention, any middleware you create that parses the request to find an authentication token should then save that token on `req.authToken`. See `simple:rest-bearer-token-parser` for an example.
-- By convention, any middleware you create that determines a user ID should save that ID on `req.userId`. See `simple:authenticate-user-by-token` for an example.
+- By convention, any middleware you create that parses the request to find an authentication token should then save that token on `req.authToken`. See `communitypackages:rest-bearer-token-parser` for an example.
+- By convention, any middleware you create that determines a user ID should save that ID on `req.userId`. See `communitypackages:authenticate-user-by-token` for an example.
 
 ## Change Log
 

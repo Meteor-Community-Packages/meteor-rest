@@ -1,12 +1,12 @@
 Package.describe({
-  name: 'simple:json-routes',
-  version: '3.0.0',
+  name: 'communitypackages:json-routes',
+  version: '3.1.0',
 
   // Brief, one-line summary of the package.
   summary: 'The simplest way to define server-side routes that return JSON',
 
   // URL to the Git repository containing the source code for this package.
-  git: 'https://github.com/stubailo/meteor-rest/tree/master/packages/json-routes',
+  git: 'https://github.com/meteor-compat/meteor-rest',
 
   // By default, Meteor will default to using README.md for documentation.
   // To avoid submitting documentation, set this field to null.
@@ -20,10 +20,9 @@ Npm.depends({
 });
 
 Package.onUse(function (api) {
-  api.versionsFrom('3.0-beta.0');
+  api.versionsFrom('3.0');
 
   api.use([
-    'underscore',
     'webapp',
   ], 'server');
 
@@ -41,7 +40,7 @@ Package.onUse(function (api) {
 Package.onTest(function (api) {
   api.use('tinytest');
   api.use('test-helpers');
-  api.use('simple:json-routes');
+  api.use('communitypackages:json-routes');
   api.use('fetch');
   api.addFiles('json-routes-tests.js');
 });

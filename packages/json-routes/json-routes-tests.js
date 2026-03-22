@@ -1,4 +1,4 @@
-// This package is also tested in the `simple:rest` package.
+// This package is also tested in the `communitypackages:rest` package.
 if (Meteor.isServer) {
   JsonRoutes.add('GET', 'case-insensitive-method-1', function (req, res) {
     JsonRoutes.sendResult(res, {data: true});

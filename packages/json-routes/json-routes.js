@@ -35,9 +35,9 @@ JsonRoutes.ErrorMiddleware = {
 };
 
 Meteor.startup(function () {
-  _.each(errorMiddlewares, function (errorMiddleware) {
-    errorMiddleware = _.map(errorMiddleware, function (maybeFn) {
-      if (_.isFunction(maybeFn)) {
+  errorMiddlewares.forEach(function (errorMiddleware) {
+    errorMiddleware = Array.from(errorMiddleware).map(function (maybeFn) {
+      if (typeof maybeFn === 'function') {
         // Express error middleware needs exactly 4 arguments because they use fn.length === 4 to
         // decide if something is an error middleware.
         return function (err, req, res, next) {
@@ -116,7 +116,7 @@ JsonRoutes.sendResult = function (res, options) {
 };
 
 function setHeaders(res, headers) {
-  _.each(headers, function (value, key) {
+  Object.entries(headers).forEach(function ([key, value]) {
     res.setHeader(key, value);
   });
 }
